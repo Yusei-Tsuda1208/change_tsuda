@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>津田の時系列並び替えクイズ</title>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f5f5f5;
+    }
+    h1 { text-align: center; }
+
+    input {
+      display: block;
+      margin: 12px auto;
+      padding: 8px;
+      font-size: 16px;
+      width: 240px;
+    }
+
+    #guide {
+      display: flex;
+      justify-content: space-between;
+      max-width: 1000px;
+      margin: 0 auto 12px;
+      font-weight: bold;
+    }
+
+    #quiz {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .item {
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      padding: 8px;
+      cursor: grab;
+    }
+
+    .item.dragging { opacity: 0.5; }
+
+    .item img {
+      max-width: 160px;
+      border-radius: 4px;
+    }
+
+    button {
+      display: block;
+      margin: 24px auto;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      background: #1976d2;
+      color: white;
+    }
+
+    .item.correct {
+      border: 3px solid red;
+    }
+
+    #result {
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      white-space: pre-line;
+      margin-top: 12px;
+    }
+
+    #correct-images {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .correct-item {
+      background: white;
+      border: 2px solid #4caf50;
+      border-radius: 8px;
+      padding: 6px;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .correct-item img {
+      max-width: 140px;
+      display: block;
+      margin-bottom: 4px;
+      border-radius: 4px;
+    }
+
+
+  </style>
+</head>
+<body>
+
+<h1>津田の時系列並び替えクイズ</h1>
+
+<input id="nickname" placeholder="ニックネームを入力">
+
+<p style="text-align:center">
+  写真をドラッグ＆ドロップして正しい時系列に並び替えてください。
+</p>
+
+<div id="guide">
+  <span>← 古い</span>
+  <span>新しい →</span>
+</div>
+
+<div id="quiz"></div>
+
+<button id="check">判定</button>
+
+<div id="result"></div>
+<div id="correct-images"></div>
+
+<script>
+  // ===== パスワードチェック =====
+  const PASSWORD = "difficult1"; // ← ここを変更
+
+  const input = prompt("パスワードを入力してください");
+
+  if (input !== PASSWORD) {
+    alert("パスワードが違います");
+    document.body.innerHTML = "";
+    throw new Error("Unauthorized");
+  }
+
+  // 🔑 Public Key を入れる
+  emailjs.init("7UqILhDVTAely1Yk4");
+
+  const correctOrder = [1, 2, 3, 4, 5, 6];
+
+  const images = [
+    { id: 1, src: './img/20211014.JPG' },
+    { id: 2, src: './img/20220814.JPG' },
+    { id: 3, src: './img/20230423.jpg' },
+    { id: 4, src: './img/20240718.jpg' },
+    { id: 5, src: './img/20250215.jpg' },
+    { id: 6, src: './img/20251130.jpg' }
+  ];
+
+  images.sort(() => Math.random() - 0.5);
+
+  const quiz = document.getElementById('quiz');
+  let dragItem = null;
+
+  images.forEach(img => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.draggable = true;
+    div.dataset.id = img.id;
+
+    const image = document.createElement('img');
+    image.src = img.src;
+
+    div.appendChild(image);
+    quiz.appendChild(div);
+
+    div.addEventListener('dragstart', () => dragItem = div);
+    div.addEventListener('dragover', e => e.preventDefault());
+    div.addEventListener('drop', () => {
+      if (dragItem && dragItem !== div) {
+        const items = [...quiz.children];
+        quiz.insertBefore(
+          dragItem,
+          items.indexOf(dragItem) < items.indexOf(div) ? div.nextSibling : div
+        );
+      }
+    });
+  });
+
+  document.getElementById('check').addEventListener('click', () => {
+    const nickname = document.getElementById('nickname').value.trim();
+    if (!nickname) {
+      alert('ニックネームを入力してください');
+      return;
+    }
+
+    const items = [...quiz.children];
+    const current = items.map(el => Number(el.dataset.id));
+
+    let correctCount = 0;
+
+    // 一度すべてリセット
+    items.forEach(el => el.classList.remove('correct'));
+
+    items.forEach((el, index) => {
+      const id = Number(el.dataset.id);
+      if (id === correctOrder[index]) {
+        correctCount++;
+        el.classList.add('correct'); // ← 赤枠
+      }
+    });
+
+    const userOrderText = current.map(id =>
+      images.find(img => img.id === id).src.split('/').pop()
+    ).join(' → ');
+
+    const correctOrderText = correctOrder.map(id =>
+      images.find(img => img.id === id).src.split('/').pop()
+    ).join(' → ');
+
+    document.getElementById('result').textContent =
+      `ニックネーム：${nickname}\n` +
+      `一致数：${correctCount} / ${correctOrder.length}\n\n` +
+      //`あなたの並び:\n${userOrderText}\n\n` +
+      `正しい並び:\n${correctOrderText}`;
+
+    // 正解画像表示
+    const correctImages = document.getElementById('correct-images');
+    correctImages.innerHTML = '';
+    correctOrder.forEach(id => {
+      const imgData = images.find(i => i.id === id);
+      const d = document.createElement('div');
+      d.className = 'correct-item';
+      d.innerHTML = `<img src="${imgData.src}"><div>${imgData.src.split('/').pop()}</div>`;
+      correctImages.appendChild(d);
+    });
+
+    /*
+    emailjs.send(
+      "service_wozej6k",
+      "template_rymexab",
+      {
+        nickname: "テスト送信"
+      }
+    )
+    .then(function(response) {
+      alert("送信成功: " + JSON.stringify(response));
+    })
+    .catch(function(error) {
+      alert("送信失敗: " + JSON.stringify(error));
+      console.error(error);
+    });*/
+
+
+    
+    // 📧 メール送信
+    emailjs.send(
+      "service_wozej6k",
+      "template_rymexab",
+      {
+        nickname: nickname,
+        score: `${correctCount} / ${correctOrder.length}`,
+        user_order: userOrderText,
+        correct_order: correctOrderText
+      }
+    );
+    
+  });
+</script>
+
+</body>
+</html>
